@@ -25,7 +25,7 @@ dotenv.config();
 //   })
 // );
 
-// mark absent at 12:55 pm daily
+// // mark absent at 12:55 pm daily
 cron.schedule("55 23 * * *", markAbsentStudents);
 
 connectDB();
