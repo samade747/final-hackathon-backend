@@ -26,6 +26,7 @@ const teacherSchema = new mongoose.Schema(
     },
     ProfilePicture: {
       type: String,
+      required: true,
     },
     Slots: [
       {

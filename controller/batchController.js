@@ -30,6 +30,7 @@ export const add = async (req, res) => {
       // .send("Missing Fields");
     } else {
       // check the course is exists
+
       const checkCourse = await Course.findOne({ CourseName: courseName });
       if (!checkCourse) {
         return res.status(NOTFOUND).send(
@@ -93,7 +94,7 @@ export const update = async (req, res) => {
     // Retrieve existing batch data
     const singleBatchData = await Batch.findById(req.params.id);
 
-    const { courseName, batchNumber, startedFrom, endDate } = req.body;
+    const { courseName, batchNumber, startedFrom, endDate, sirname } = req.body;
 
     // Check if the combination of courseName and batchNumber already exists in another document
     const checkBatch = await Batch.findOne({
@@ -131,6 +132,7 @@ export const update = async (req, res) => {
       BatchNumber: batchNumber || singleBatchData.BatchNumber,
       StartedFrom: new Date(startedFrom || singleBatchData.StartedFrom),
       EndDate: new Date(endDate || singleBatchData.EndDate),
+      SirName: sirname || singleBatchData.SirName,
     };
 
     // Update the batch

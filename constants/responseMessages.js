@@ -34,7 +34,7 @@ export const responseMessages = {
   SLOT_EXISTS: "Slot of this teacher already exists in this Batch!",
   USER_NAME_EXISTS: "User name already taken, kindly choose another",
   MISSING_FIELDS: "All Fields are required",
-  SUCCESS_REGISTRATION: "User Registartion Successful",
+  SUCCESS_REGISTRATION: "User Registartion Successfull",
   SUCCESS_DEACTIVATE: "User Deactivation Successful",
   SUCCESS_ACTIVATE: "User Activation Successful",
   NO_USER: "No User found",

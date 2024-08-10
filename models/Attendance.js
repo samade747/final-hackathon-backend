@@ -7,7 +7,7 @@ const attendanceSchema = new mongoose.Schema(
       required: true,
     },
     SlotId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Number,
       ref: "Slot",
       required: true,
     },

@@ -16,6 +16,8 @@ import { GenerateToken, ValidateToken, VerifyToken } from "../helpers/token.js";
 import pkg from "jsonwebtoken";
 import { sendEmailOTP } from "../helpers/sendOtp.js";
 import User from "../models/Users.js";
+import Student from "../models/Student.js";
+import Teacher from "../models/Teacher.js";
 
 const { verify, decode, sign } = pkg;
 
@@ -24,6 +26,9 @@ export const signUp = async (req, res) => {
 
   try {
     const { role, email, password } = req.body;
+
+    // change the role in to lowercase
+    role = role.toLowerCase();
 
     if (!email || !password || !role) {
       return res
@@ -80,7 +85,7 @@ export const signUp = async (req, res) => {
         //otp
         const otp = uuidv4().slice(0, 6);
         console.log(otp, "==>> otp");
-        doc.otp = otp;  
+        doc.otp = otp;
         doc.expiresIn = Date.now() + 60000; // OTP expires in 10 minutes
         let savedUser = await doc.save();
         if (savedUser.errors) {
@@ -403,7 +408,6 @@ export const isUserLoggedIn = async (req, res) => {
       .send(error.message);
   }
 };
-
 
 // @desc    RefreshToken
 // @route   GET api/auth/refreshToken

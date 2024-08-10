@@ -8,8 +8,15 @@ import Batch from "../models/Batch.js";
 const { verify, decode, sign } = pkg;
 
 export const add = async (req, res) => {
-  const { courseName, batchNumber, startTime, endTime, days, teacherId } =
-    req.body;
+  const {
+    courseName,
+    batchNumber,
+    startTime,
+    endTime,
+    days,
+    teacherId,
+    slotId,
+  } = req.body;
 
   console.log("Received request:", req.body);
 
@@ -21,9 +28,18 @@ export const add = async (req, res) => {
       !startTime ||
       !endTime ||
       !days ||
-      !teacherId
+      !teacherId ||
+      !slotId
     ) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // check the slot  id is unique
+    const checkSlotId = await Slot.findOne({ SlotId: slotId });
+    console.log(checkSlotId + "===>>> checkSlotId");
+    if (checkSlotId) {
+      console.log(`SlotId ${slotId} already exists`);
+      return res.status(400).json({ error: "SlotId already exists" });
     }
 
     // check the course name and batch number
@@ -103,6 +119,7 @@ export const add = async (req, res) => {
       EndTime: endTime,
       Days: days,
       TeacherId: teacher.TeacherId,
+      SlotId: slotId,
     });
     console.log(newSlot + "===>>> newSlot");
 
@@ -228,10 +245,25 @@ export const getSlot = async (req, res) => {
 
 export const update = async (req, res) => {
   const { id } = req.params; // Slot ID to update
-  const { courseName, batchNumber, startTime, endTime, days, teacherId } =
-    req.body;
+  const {
+    courseName,
+    batchNumber,
+    startTime,
+    endTime,
+    days,
+    teacherId,
+    slotId,
+  } = req.body;
 
   try {
+    // check the slot id is unique
+    if (slotId) {
+      const existingSlot = await Slot.findOne({ slotId, SlotId: { $ne: id } });
+      if (existingSlot) {
+        return res.status(409).json({ error: "Slot ID already exists" });
+      }
+    }
+
     // Find the slot by ID
     const slot = await Slot.findById(id);
     if (!slot) {

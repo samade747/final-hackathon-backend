@@ -1,5 +1,8 @@
 import express from "express";
-import { markAttendance } from "../controller/attendanceController.js";
+import {
+  markAttendance,
+  viewAttendance,
+} from "../controller/attendanceController.js";
 
 const attendanceRoutes = express.Router();
 
@@ -11,7 +14,7 @@ attendanceRoutes.post("/markattendance", markAttendance);
 // View Attendance
 // GET http://localhost:9000/api/attendance/attendance
 // Public
-// attendanceRoutes.get("/attendance", viewAttendance);
+attendanceRoutes.get("/attendance", viewAttendance);
 
 // mark absent
 // post http://localhost:9000/api/attendance/markabsent

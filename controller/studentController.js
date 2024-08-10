@@ -6,6 +6,7 @@ import {
   FORBIDDEN,
   INTERNALERROR,
   OK,
+  NOTFOUND,
 } from "../constants/httpStatus.js";
 import { responseMessages } from "../constants/responseMessages.js";
 import Course from "../models/Course.js";
@@ -17,7 +18,6 @@ import Slot from "../models/Slot.js";
 const { verify, decode, sign } = pkg;
 
 export const add = async (req, res) => {
-  console.log(req.body);
   const {
     fullName,
     email,
@@ -27,10 +27,10 @@ export const add = async (req, res) => {
     batchNumber,
     slotId,
     rollNumber,
+    profilePicture,
   } = req.body;
 
   try {
-    // Check for missing fields
     if (
       !fullName ||
       !email ||
@@ -39,7 +39,8 @@ export const add = async (req, res) => {
       !courseName ||
       !batchNumber ||
       !slotId ||
-      !rollNumber
+      !rollNumber ||
+      !profilePicture
     ) {
       return res
         .status(BADREQUEST)
@@ -48,7 +49,6 @@ export const add = async (req, res) => {
         );
     }
 
-    // Check if student email already exists
     const checkEmail = await Student.findOne({ Email: email });
     if (checkEmail) {
       return res
@@ -58,7 +58,6 @@ export const add = async (req, res) => {
         );
     }
 
-    // Check if student father's email already exists
     const checkFatherEmail = await Student.findOne({
       FatherEmail: fatherEmail,
     });
@@ -71,7 +70,6 @@ export const add = async (req, res) => {
       );
     }
 
-    // check course is exsists
     const checkCourse = await Course.findOne({ CourseName: courseName });
     if (!checkCourse) {
       return res
@@ -81,7 +79,6 @@ export const add = async (req, res) => {
         );
     }
 
-    // Check if student phone number already exists
     const checkPhoneNumber = await Student.findOne({
       PhoneNumber: phoneNumber,
     });
@@ -93,16 +90,11 @@ export const add = async (req, res) => {
         );
     }
 
-    // Validate batch existence and validity
     const checkBatch = await Batch.findOne({
       CourseName: courseName,
       BatchNumber: batchNumber,
     });
-
-    console.log(checkBatch);
-
     if (!checkBatch) {
-      console.log("Invalid Batch", { batchNumber, courseName }); // Log for debugging
       return res
         .status(BADREQUEST)
         .send(
@@ -110,7 +102,6 @@ export const add = async (req, res) => {
         );
     }
 
-    // Check if batch has expired
     const checkExpiry = new Date(checkBatch.EndDate);
     if (checkExpiry < new Date()) {
       return res
@@ -120,25 +111,15 @@ export const add = async (req, res) => {
         );
     }
 
-    // Validate slot existence and course match
-    const checkSlot = await Slot.findOne({ _id: slotId });
-    if (!checkSlot) {
+    const checkSlot = await Slot.findOne({ SlotId: slotId });
+    if (!checkSlot || checkSlot.CourseName !== courseName) {
       return res
         .status(BADREQUEST)
         .send(
           sendError({ status: false, message: responseMessages.INVALID_SLOT })
         );
     }
-    if (checkSlot.CourseName !== courseName) {
-      return res.status(BADREQUEST).send(
-        sendError({
-          status: false,
-          message: "This slot is not for this course",
-        })
-      );
-    }
 
-    // check the rollNumber is unique
     const checkRollNumber = await Student.findOne({ RollNumber: rollNumber });
     if (checkRollNumber) {
       return res.status(BADREQUEST).send(
@@ -149,8 +130,7 @@ export const add = async (req, res) => {
       );
     }
 
-    // Create new student object
-    const obj = {
+    const student = new Student({
       FullName: fullName,
       Email: email,
       FatherEmail: fatherEmail,
@@ -159,26 +139,24 @@ export const add = async (req, res) => {
       BatchNumber: batchNumber,
       SlotId: slotId,
       RollNumber: rollNumber,
-    };
-    console.log(obj);
-    const student = new Student(obj);
+      ProfilePicture: profilePicture,
+    });
+
     const data = await student.save();
 
-    // Update slot's StudentsId array
-    await Slot.findByIdAndUpdate(
-      slotId,
+    await Slot.findOneAndUpdate(
+      { SlotId: slotId },
       { $push: { StudentsId: data._id } },
       { new: true }
     );
 
-    // Respond with success message
     res.status(CREATED).json({
       status: true,
       message: responseMessages.STUDENT_ADDED,
       data: data,
     });
   } catch (error) {
-    console.error(error); // Log any unexpected errors
+    console.error(error);
     return res.status(INTERNALERROR).send(
       sendError({
         status: false,
@@ -187,9 +165,9 @@ export const add = async (req, res) => {
     );
   }
 };
+
 export const update = async (req, res) => {
   const { id } = req.params;
-  console.log(req.body);
   const {
     fullName,
     email,
@@ -199,11 +177,12 @@ export const update = async (req, res) => {
     batchNumber,
     slotId,
     rollNumber,
+    profilePicture,
   } = req.body;
 
   try {
-    const checkId = await Student.findOne({ _id: id });
-    if (!checkId) {
+    const student = await Student.findById(id);
+    if (!student) {
       return res.status(BADREQUEST).send(
         sendError({
           status: false,
@@ -212,21 +191,24 @@ export const update = async (req, res) => {
       );
     }
 
-    // check if email already exists
+    // image update
+    if (profilePicture) {
+      student.ProfilePicture = profilePicture;
+    }
+
     if (email) {
       const checkEmail = await Student.findOne({
         Email: email,
         _id: { $ne: id },
       });
       if (checkEmail) {
-        return res.status(ALREADYEXISTS).send(
-          sendError({
-            status: false,
-            message: responseMessages.EMAIL_EXISTS,
-          })
-        );
+        return res
+          .status(ALREADYEXISTS)
+          .send(
+            sendError({ status: false, message: responseMessages.EMAIL_EXISTS })
+          );
       } else {
-        checkId.Email = email;
+        student.Email = email;
       }
     }
 
@@ -243,29 +225,26 @@ export const update = async (req, res) => {
           })
         );
       } else {
-        checkId.FatherEmail = fatherEmail;
+        student.FatherEmail = fatherEmail;
       }
     }
 
-    // check if phone number already exists
     if (phoneNumber) {
       const checkPhoneNumber = await Student.findOne({
         PhoneNumber: phoneNumber,
         _id: { $ne: id },
       });
       if (checkPhoneNumber) {
-        return res.status(ALREADYEXISTS).send(
-          sendError({
-            status: false,
-            message: responseMessages.PHONE_EXISTS,
-          })
-        );
+        return res
+          .status(ALREADYEXISTS)
+          .send(
+            sendError({ status: false, message: responseMessages.PHONE_EXISTS })
+          );
       } else {
-        checkId.PhoneNumber = phoneNumber;
+        student.PhoneNumber = phoneNumber;
       }
     }
 
-    //check if course is exsists
     if (courseName) {
       const checkCourse = await Course.findOne({ CourseName: courseName });
       if (!checkCourse) {
@@ -276,17 +255,15 @@ export const update = async (req, res) => {
           })
         );
       } else {
-        checkId.CourseName = courseName;
+        student.CourseName = courseName;
       }
     }
 
-    // check if batch is valid and not expired
     if (batchNumber || courseName) {
       const checkBatch = await Batch.findOne({
-        BatchNumber: batchNumber || checkId.BatchNumber,
-        CourseName: courseName || checkId.CourseName,
+        BatchNumber: batchNumber || student.BatchNumber,
+        CourseName: courseName || student.CourseName,
       });
-      console.log(checkBatch + "=====>>> checkBatch");
       if (!checkBatch) {
         return res.status(BADREQUEST).send(
           sendError({
@@ -295,7 +272,6 @@ export const update = async (req, res) => {
           })
         );
       } else {
-        // check if batch is expired
         const checkExpiry = new Date(checkBatch.Expiry);
         if (checkExpiry < new Date()) {
           return res.status(BADREQUEST).send(
@@ -306,83 +282,58 @@ export const update = async (req, res) => {
           );
         }
 
-        checkId.BatchNumber = batchNumber || checkId.BatchNumber;
-        checkId.CourseName = courseName || checkId.CourseName;
+        student.BatchNumber = batchNumber || student.BatchNumber;
+        student.CourseName = courseName || student.CourseName;
       }
     }
 
-    let oldSlotId = checkId.SlotId;
-    // check if slot is valid
+    let oldSlotId = student.SlotId;
     if (slotId) {
-      const checkSlot = await Slot.findById(slotId);
-      if (!checkSlot) {
+      const checkSlot = await Slot.findOne({ SlotId: slotId });
+      if (!checkSlot || checkSlot.CourseName !== student.CourseName) {
+        return res
+          .status(BADREQUEST)
+          .send(
+            sendError({ status: false, message: responseMessages.INVALID_SLOT })
+          );
+      } else {
+        student.SlotId = slotId;
+      }
+    }
+
+    if (rollNumber) {
+      const checkRollNumber = await Student.findOne({
+        RollNumber: rollNumber,
+        _id: { $ne: id },
+      });
+      if (checkRollNumber) {
         return res.status(BADREQUEST).send(
           sendError({
             status: false,
-            message: responseMessages.INVALID_SLOT,
+            message: responseMessages.ROLL_NUMBER_EXISTS,
           })
         );
       } else {
-        const checkCourseName = checkSlot.CourseName;
-        const checkBatchNumber = checkSlot.BatchNumber;
-        if (
-          checkId.CourseName !== checkCourseName ||
-          checkId.BatchNumber !== checkBatchNumber
-        ) {
-          return res.status(BADREQUEST).send(
-            sendError({
-              status: false,
-              message: responseMessages.INVALID_SLOT,
-            })
-          );
-        } else {
-          checkId.SlotId = slotId;
-        }
+        student.RollNumber = rollNumber;
       }
     }
 
-    if (batchNumber || courseName) {
-      // check the slot if the slot is for this course or batch
-      const slot = await Slot.findById(checkId.SlotId);
-      if (slot) {
-        const checkCourseName = slot.CourseName;
-        const checkBatchNumber = slot.BatchNumber;
-        if (
-          checkId.CourseName !== checkCourseName ||
-          checkId.BatchNumber !== checkBatchNumber
-        ) {
-          return res.status(BADREQUEST).send(
-            sendError({
-              status: false,
-              message: responseMessages.INVALID_SLOT,
-            })
-          );
-        }
-      }
-    }
+    const updatedStudent = await Student.findByIdAndUpdate(
+      id,
+      { $set: student },
+      { new: true }
+    );
 
-    // Update the student
-    const updatedStudent = await Student.findByIdAndUpdate(id, checkId, {
-      new: true,
-    });
-
-    // Update the slot's StudentsId array if slotId has changed
-    if (slotId) {
-      const slot = await Slot.findById(slotId);
-      if (slot) {
-        const updated = [...slot.StudentsId, updatedStudent._id];
-        await Slot.updateOne({ _id: slotId }, { StudentsId: updated });
-
-        // Remove the student from the old slot's StudentsId array
-        const oldSlot = await Slot.findById(oldSlotId);
-        if (oldSlot) {
-          const oldUpdated = oldSlot.StudentsId.filter(
-            (studentId) =>
-              studentId.toString() !== updatedStudent._id.toString()
-          );
-          await Slot.updateOne({ _id: oldSlotId }, { StudentsId: oldUpdated });
-        }
-      }
+    if (slotId && oldSlotId !== slotId) {
+      await Slot.findOneAndUpdate(
+        { SlotId: slotId },
+        { $push: { StudentsId: updatedStudent._id } },
+        { new: true }
+      );
+      await Slot.findOneAndUpdate(
+        { SlotId: oldSlotId },
+        { $pull: { StudentsId: updatedStudent._id } }
+      );
     }
 
     res.status(OK).json({
@@ -396,7 +347,6 @@ export const update = async (req, res) => {
       sendError({
         status: false,
         message: error.message,
-        data: null,
       })
     );
   }
@@ -409,26 +359,23 @@ export const deleteStudent = async (req, res) => {
       return res.status(NOTFOUND).send(
         sendError({
           status: false,
-          message: "Student not found",
+          message: responseMessages.INVALID_ID,
         })
       );
-    } else {
-      const deleted = await Student.findByIdAndDelete(req.params.id);
-
-      // update the slot student array
-      const slot = await Slot.findOne({ _id: student.SlotId });
-      if (slot) {
-        const updated = slot.StudentsId.filter(
-          (studentId) => studentId.toString() !== deleted._id.toString()
-        );
-        await Slot.updateOne({ _id: slot._id }, { StudentsId: updated });
-      }
-      res.status(OK);
-      res.json({
-        status: true,
-        message: "Student deleted successfully",
-      });
     }
+
+    await Student.findByIdAndDelete(req.params.id);
+    await Slot.findOneAndUpdate(
+      { SlotId: student.SlotId },
+      { $pull: { StudentsId: student._id } }
+    );
+
+    res.status(OK).send(
+      sendSuccess({
+        status: true,
+        message: responseMessages.STUDENT_DELETED,
+      })
+    );
   } catch (error) {
     console.log(error);
     return res.status(INTERNALERROR).send(
